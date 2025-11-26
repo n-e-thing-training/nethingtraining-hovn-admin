@@ -1,0 +1,14 @@
+playwright
+psycopg2-binary
+SQLAlchemy
+alembic
+phonenumbers
+python-dateutil
+pendulum
+pydantic
+pydantic[email]
+usaddress
+validators
+requests
+python-dotenv
+pyairtable
