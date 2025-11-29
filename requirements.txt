@@ -12,5 +12,5 @@ validators
 requests
 python-dotenv
 pyairtable
-uvicorn[standard]
 gunicorn
+uvicorn[standard]
