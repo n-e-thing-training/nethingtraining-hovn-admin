@@ -14,3 +14,4 @@ python-dotenv
 pyairtable
 gunicorn
 uvicorn[standard]
+fastapi
