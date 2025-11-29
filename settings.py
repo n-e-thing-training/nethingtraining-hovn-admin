@@ -7,7 +7,7 @@ load_dotenv()
 # Postgres connection
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql+psycopg2://postgres:admin@localhost:5432/hovn",
+    "postgresql://neondb_owner:npg_xlz8Uq2omAMW@ep-weathered-waterfall-a82hrp3w-pooler.eastus2.azure.neon.tech/neondb?sslmode=require&channel_binding=require",
 )
 
 # Hovn admin provider slug
