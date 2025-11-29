@@ -9,7 +9,7 @@ const navLinkInactive = "text-slate-300 hover:bg-slate-700/60";
 
 function Layout({ children }) {
   return (
-    <div className="h-screen bg-slate-950 text-slate-50 flex">
+    <div className="min-h-screen h-auto bg-slate-950 text-slate-50 flex">
       {/* Sidebar */}
       <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
         <div className="px-4 py-4 border-b border-slate-800">
