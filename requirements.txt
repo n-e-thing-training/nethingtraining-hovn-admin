@@ -15,3 +15,4 @@ pyairtable
 gunicorn
 uvicorn[standard]
 fastapi
+beautifulsoup4
