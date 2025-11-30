@@ -3,7 +3,7 @@ import re
 from datetime import datetime, date, timedelta
 from typing import List, Dict, Any
 
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI, Depends, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -296,6 +296,55 @@ def import_single_booking(payload: dict):
     persist_full_normalized_bundle(normalized)
 
     return {"status": "ok", "booking_ref": ref}
+
+@app.post("/api/bookings/add")
+def add_booking(payload: dict, db: Session = Depends(get_db)):
+    """
+    Add a single booking_ref into the system by:
+      1) Scraping HOVN booking + session data
+      2) Normalizing
+      3) Persisting into Postgres
+      4) Scraping ARC certs and linking to student
+    """
+
+    booking_ref = (payload.get("booking_ref") or "").strip()
+    if not booking_ref:
+        return {"error": "booking_ref is required"}
+
+    # --- Step 1: Scrape from HOVN ---
+    try:
+        scraped = scrape_booking_and_session(booking_ref)
+    except Exception as e:
+        return {"error": f"HOVN scrape failed: {e}"}
+
+    # --- Step 2: Normalize ---
+    try:
+        normalized = normalize_full_bundle(scraped)
+    except Exception as e:
+        return {"error": f"Normalization failed: {e}"}
+
+    # --- Step 3: Persist into DB ---
+    try:
+        result = persist_full_normalized_bundle(normalized)
+    except Exception as e:
+        return {"error": f"DB write failed: {e}"}
+
+    # result contains IDs of created objects:
+    #   result = {"booking_id": ..., "student_id": ..., "session_id": ..., "order_id": ...}
+
+    # --- Step 4: ARC cert scraping ---
+    student = db.query(Student).filter(Student.id == result["student_id"]).first()
+    if student and student.email:
+        email = student.email.strip().lower()
+        certs = scrape_certs_for_email(email) or []
+        if certs:
+            _upsert_certs_for_student(db, student, certs)
+
+    return {
+        "status": "ok",
+        "booking_ref": booking_ref,
+        "db_result": result
+    }
 
 # -------------------- CERT LOOKUP -------------------------
 
