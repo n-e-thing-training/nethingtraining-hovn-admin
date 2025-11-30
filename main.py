@@ -298,51 +298,27 @@ def import_single_booking(payload: dict):
     return {"status": "ok", "booking_ref": ref}
 
 @app.post("/api/bookings/add")
-def add_booking(
-    booking_ref: str | None = None,
-    body: dict | None = Body(None),
-):
+def add_booking(booking_ref: str = Query(...), db: Session = Depends(get_db)):
     """
-    Accepts:
-        /api/bookings/add?booking_ref=brn_XXXX
-        OR
-        { "booking_ref": "brn_XXXX" }
-
-    Runs:
-        1. Scrape HOVN
-        2. Normalize
-        3. Persist to DB
+    Add a booking by reference, scrape HOVN, normalize, persist to DB.
+    Returns the stored student + booking IDs.
     """
 
-    # --- Extract booking_ref from either location ---
-    if not booking_ref:
-        if body and "booking_ref" in body:
-            booking_ref = body["booking_ref"]
+    # 1) Scrape booking + session from HOVN
+    scraped = scrape_booking_and_session(booking_ref)
+    if not scraped:
+        return {"error": "HOVN lookup failed", "booking_ref": booking_ref}
 
-    if not booking_ref:
-        return {"error": "booking_ref is required"}
+    # 2) Normalize
+    normalized = normalize_full_bundle(scraped)
 
-    booking_ref = booking_ref.strip()
-
-    # --- 1. Scrape raw ---
-    from hovn_scraper import scrape_booking_and_session
-    raw = scrape_booking_and_session(booking_ref)
-
-    if not raw:
-        return {"error": f"No data found for {booking_ref}"}
-
-    # --- 2. Normalize ---
-    from normalize import normalize_full_bundle
-    normalized = normalize_full_bundle(raw)
-
-    # --- 3. Persist to DB ---
-    from db_pipeline import persist_full_normalized_bundle
-    persist_full_normalized_bundle(normalized)
+    # 3) Persist to DB
+    result = persist_full_normalized_bundle(normalized)
 
     return {
         "status": "ok",
         "booking_ref": booking_ref,
-        "normalized": normalized,
+        "persist_result": result
     }
 
 # -------------------- CERT LOOKUP -------------------------
