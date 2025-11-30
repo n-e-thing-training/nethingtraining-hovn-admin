@@ -298,53 +298,47 @@ def import_single_booking(payload: dict):
     return {"status": "ok", "booking_ref": ref}
 
 @app.post("/api/bookings/add")
-def add_booking(payload: dict, db: Session = Depends(get_db)):
+@app.post("/api/bookings/add")
+def add_booking(
+    booking_ref: str = Form(None),
+    payload: dict | None = None,
+    db: Session = Depends(get_db)
+):
     """
-    Add a single booking_ref into the system by:
-      1) Scraping HOVN booking + session data
-      2) Normalizing
-      3) Persisting into Postgres
-      4) Scraping ARC certs and linking to student
+    Accepts EITHER:
+      • JSON:   { "booking_ref": "brn_ABC123" }
+      • FORM:   booking_ref=brn_ABC123
+
+    Then:
+      - Scrapes HOVN booking+session
+      - Normalizes
+      - Saves to DB
     """
 
-    booking_ref = (payload.get("booking_ref") or "").strip()
-    if not booking_ref:
-        return {"error": "booking_ref is required"}
+    # 1) Determine booking ref from either JSON or form
+    if payload and isinstance(payload, dict) and payload.get("booking_ref"):
+        bref = payload["booking_ref"].strip()
+    elif booking_ref:
+        bref = booking_ref.strip()
+    else:
+        return {"error": "booking_ref missing"}
 
-    # --- Step 1: Scrape from HOVN ---
-    try:
-        scraped = scrape_booking_and_session(booking_ref)
-    except Exception as e:
-        return {"error": f"HOVN scrape failed: {e}"}
+    # 2) Scrape
+    from hovn_scraper import scrape_booking_and_session
+    raw = scrape_booking_and_session(bref)
 
-    # --- Step 2: Normalize ---
-    try:
-        normalized = normalize_full_bundle(scraped)
-    except Exception as e:
-        return {"error": f"Normalization failed: {e}"}
+    if not raw:
+        return {"error": f"Booking '{bref}' not found"}
 
-    # --- Step 3: Persist into DB ---
-    try:
-        result = persist_full_normalized_bundle(normalized)
-    except Exception as e:
-        return {"error": f"DB write failed: {e}"}
+    # 3) Normalize
+    from normalize import normalize_full_bundle
+    normalized = normalize_full_bundle(raw)
 
-    # result contains IDs of created objects:
-    #   result = {"booking_id": ..., "student_id": ..., "session_id": ..., "order_id": ...}
+    # 4) Persist
+    from db_pipeline import persist_full_normalized_bundle
+    persist_full_normalized_bundle(normalized)
 
-    # --- Step 4: ARC cert scraping ---
-    student = db.query(Student).filter(Student.id == result["student_id"]).first()
-    if student and student.email:
-        email = student.email.strip().lower()
-        certs = scrape_certs_for_email(email) or []
-        if certs:
-            _upsert_certs_for_student(db, student, certs)
-
-    return {
-        "status": "ok",
-        "booking_ref": booking_ref,
-        "db_result": result
-    }
+    return {"status": "ok", "booking_ref": bref}
 
 # -------------------- CERT LOOKUP -------------------------
 
