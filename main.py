@@ -298,7 +298,6 @@ def import_single_booking(payload: dict):
     return {"status": "ok", "booking_ref": ref}
 
 @app.post("/api/bookings/add")
-@app.post("/api/bookings/add")
 def add_booking(
     booking_ref: str = Form(None),
     payload: dict | None = None,
