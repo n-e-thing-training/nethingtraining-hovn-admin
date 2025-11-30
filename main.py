@@ -3,7 +3,7 @@ import re
 from datetime import datetime, date, timedelta
 from typing import List, Dict, Any
 
-from fastapi import FastAPI, Depends, Request, APIRouter, Form
+from fastapi import FastAPI, Depends, Request, APIRouter, Form, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -299,47 +299,51 @@ def import_single_booking(payload: dict):
 
 @app.post("/api/bookings/add")
 def add_booking(
-    booking_ref: str = Query(None, description="HOVN booking reference (e.g., brn_3K4AR2)"),
-    payload: dict = None,
-    db: Session = Depends(get_db),
+    booking_ref: str | None = None,
+    body: dict | None = Body(None),
 ):
     """
-    Add a booking by booking_ref.
-    Accepts either:
-    - /api/bookings/add?booking_ref=brn_XXXX
-    - JSON: { "booking_ref": "brn_XXXX" }
+    Accepts:
+        /api/bookings/add?booking_ref=brn_XXXX
+        OR
+        { "booking_ref": "brn_XXXX" }
 
-    Runs the pipeline:
-        1. Scrape booking + session from HOVN
+    Runs:
+        1. Scrape HOVN
         2. Normalize
         3. Persist to DB
     """
 
-    # Support JSON body as well
-    if payload and not booking_ref:
-        booking_ref = payload.get("booking_ref")
+    # --- Extract booking_ref from either location ---
+    if not booking_ref:
+        if body and "booking_ref" in body:
+            booking_ref = body["booking_ref"]
 
     if not booking_ref:
-        return {"error": "Missing booking_ref"}
+        return {"error": "booking_ref is required"}
 
     booking_ref = booking_ref.strip()
-    if not booking_ref.startswith("brn_"):
-        return {"error": "Invalid booking_ref format"}
 
-    # RUN PIPELINE
-    try:
-        result = run_pipeline(booking_ref)
-        return {
-            "status": "ok",
-            "booking_ref": booking_ref,
-            "pipeline_result": result,
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "booking_ref": booking_ref,
-            "detail": str(e),
-        }
+    # --- 1. Scrape raw ---
+    from hovn_scraper import scrape_booking_and_session
+    raw = scrape_booking_and_session(booking_ref)
+
+    if not raw:
+        return {"error": f"No data found for {booking_ref}"}
+
+    # --- 2. Normalize ---
+    from normalize import normalize_full_bundle
+    normalized = normalize_full_bundle(raw)
+
+    # --- 3. Persist to DB ---
+    from db_pipeline import persist_full_normalized_bundle
+    persist_full_normalized_bundle(normalized)
+
+    return {
+        "status": "ok",
+        "booking_ref": booking_ref,
+        "normalized": normalized,
+    }
 
 # -------------------- CERT LOOKUP -------------------------
 
