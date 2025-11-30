@@ -8,6 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from hovn_scraper import scrape_booking_and_session
+from normalize import normalize_full_bundle
+from db_pipeline import persist_full_normalized_bundle
+
 
 from db import get_db
 from models import (
@@ -277,6 +281,21 @@ def migrate_students_by_booking_refs(payload: dict, db: Session = Depends(get_db
         "processed_bookings": len(bookings),
     }
 
+@app.post("/api/bookings/import")
+def import_single_booking(payload: dict):
+    """Full booking ingestion: scrape → normalize → persist."""
+    ref = payload.get("booking_ref")
+    if not ref:
+        return {"error": "booking_ref is required"}
+
+    scraped = scrape_booking_and_session(ref)
+    if not scraped:
+        return {"error": f"Could not scrape booking {ref}"}
+
+    normalized = normalize_full_bundle(scraped)
+    persist_full_normalized_bundle(normalized)
+
+    return {"status": "ok", "booking_ref": ref}
 
 # -------------------- CERT LOOKUP -------------------------
 
