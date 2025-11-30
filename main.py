@@ -299,45 +299,47 @@ def import_single_booking(payload: dict):
 
 @app.post("/api/bookings/add")
 def add_booking(
-    booking_ref: str = Form(None),
-    payload: dict | None = None,
-    db: Session = Depends(get_db)
+    booking_ref: str = Query(None, description="HOVN booking reference (e.g., brn_3K4AR2)"),
+    payload: dict = None,
+    db: Session = Depends(get_db),
 ):
     """
-    Accepts EITHER:
-      • JSON:   { "booking_ref": "brn_ABC123" }
-      • FORM:   booking_ref=brn_ABC123
+    Add a booking by booking_ref.
+    Accepts either:
+    - /api/bookings/add?booking_ref=brn_XXXX
+    - JSON: { "booking_ref": "brn_XXXX" }
 
-    Then:
-      - Scrapes HOVN booking+session
-      - Normalizes
-      - Saves to DB
+    Runs the pipeline:
+        1. Scrape booking + session from HOVN
+        2. Normalize
+        3. Persist to DB
     """
 
-    # 1) Determine booking ref from either JSON or form
-    if payload and isinstance(payload, dict) and payload.get("booking_ref"):
-        bref = payload["booking_ref"].strip()
-    elif booking_ref:
-        bref = booking_ref.strip()
-    else:
-        return {"error": "booking_ref missing"}
+    # Support JSON body as well
+    if payload and not booking_ref:
+        booking_ref = payload.get("booking_ref")
 
-    # 2) Scrape
-    from hovn_scraper import scrape_booking_and_session
-    raw = scrape_booking_and_session(bref)
+    if not booking_ref:
+        return {"error": "Missing booking_ref"}
 
-    if not raw:
-        return {"error": f"Booking '{bref}' not found"}
+    booking_ref = booking_ref.strip()
+    if not booking_ref.startswith("brn_"):
+        return {"error": "Invalid booking_ref format"}
 
-    # 3) Normalize
-    from normalize import normalize_full_bundle
-    normalized = normalize_full_bundle(raw)
-
-    # 4) Persist
-    from db_pipeline import persist_full_normalized_bundle
-    persist_full_normalized_bundle(normalized)
-
-    return {"status": "ok", "booking_ref": bref}
+    # RUN PIPELINE
+    try:
+        result = run_pipeline(booking_ref)
+        return {
+            "status": "ok",
+            "booking_ref": booking_ref,
+            "pipeline_result": result,
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "booking_ref": booking_ref,
+            "detail": str(e),
+        }
 
 # -------------------- CERT LOOKUP -------------------------
 
