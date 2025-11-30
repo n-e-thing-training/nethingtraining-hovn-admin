@@ -9,7 +9,8 @@ const navLinkInactive = "text-slate-300 hover:bg-slate-700/60";
 
 function Layout({ children }) {
   return (
-    <div className="min-h-screen h-auto bg-slate-950 text-slate-50 flex">
+    <div className="min-h-screen bg-slate-950 text-slate-50 flex">
+
       {/* Sidebar */}
       <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
         <div className="px-4 py-4 border-b border-slate-800">
@@ -19,7 +20,7 @@ function Layout({ children }) {
           <div className="text-[11px] text-slate-400">HOVN Admin Dashboard</div>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-auto">
           <NavLink
             to="/dashboard"
             className={({ isActive }) =>
@@ -47,7 +48,7 @@ function Layout({ children }) {
             Students
           </NavLink>
 
-          {/* 🔥 NEW LINKS HERE */}
+          {/* Added links */}
           <NavLink
             to="/cert-lookup"
             className={({ isActive }) =>
@@ -72,15 +73,21 @@ function Layout({ children }) {
         </div>
       </aside>
 
-      {/* Main */}
+      {/* Main content */}
       <main className="flex-1 flex flex-col">
+
+        {/* Header */}
         <header className="h-12 flex items-center justify-between border-b border-slate-800 px-6 bg-slate-950/80">
           <h1 className="text-sm font-semibold">Dashboard</h1>
           <span className="text-[11px] text-emerald-400">Up to date</span>
         </header>
 
-        <div className="flex-1 overflow-auto px-6 py-4">{children}</div>
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-auto px-6 py-4">
+          {children}
+        </div>
       </main>
+
     </div>
   );
 }
