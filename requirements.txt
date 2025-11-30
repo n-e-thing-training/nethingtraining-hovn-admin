@@ -16,3 +16,5 @@ gunicorn
 uvicorn[standard]
 fastapi
 beautifulsoup4
+multipart
+python-multipart
